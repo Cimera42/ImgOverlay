@@ -5,19 +5,34 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ImgOverlay"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525"
+        Title="MainWindow"
         Topmost="True"
         WindowStyle="None"
         AllowsTransparency="True"
-        ResizeMode="CanResizeWithGrip"
         Loaded="Window_Loaded"
         MouseDown="Window_MouseDown"
-        Cursor="SizeAll"
+        Top="0"
+        Left="0"
 >
     <Window.Background>
         <SolidColorBrush Opacity="0" Color="White" />
     </Window.Background>
-    <Grid x:Name="Container">
-        <Image x:Name="DisplayImage" />
-    </Grid>
+    <Canvas>
+        <Grid x:Name="Container" Width="525" Height="350" Canvas.Left="0" Canvas.Top="0" Background="Transparent">
+            <Thumb DragDelta="Thumb2_DragDelta" x:Name="DisplayImageThumb" >
+                <Thumb.Template>
+                    <ControlTemplate>
+                        <Image Cursor="SizeAll" x:Name="DisplayImage"/>
+                    </ControlTemplate>
+                </Thumb.Template>
+            </Thumb>
+            <Thumb DragDelta="Thumb_DragDelta" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Bottom" DragStarted="Thumb_DragStarted">
+                <Thumb.Template>
+                    <ControlTemplate>
+                        <Canvas Background="red"/>
+                    </ControlTemplate>
+                </Thumb.Template>
+            </Thumb>
+        </Grid>
+    </Canvas>
 </Window>
