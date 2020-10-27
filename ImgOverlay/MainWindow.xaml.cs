@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -22,8 +23,6 @@ namespace ImgOverlay
             Application.Current.ShutdownMode = ShutdownMode.OnMainWindowClose;
 
             InitializeComponent();
-
-            this.SizeChanged += Window_SizeChanged;
 
             DataContext = images;
         }
@@ -58,55 +57,6 @@ namespace ImgOverlay
             images.Add(img);
         }
 
-        public void ChangeOpacity(float opacity)
-        {
-            //displayImage.Opacity = opacity;
-        }
-
-        public void ChangeRotation(float angle)
-        {
-            // Create a transform to rotate the button
-            RotateTransform myRotateTransform = new RotateTransform();
-
-            // Set the rotation of the transform.
-            myRotateTransform.Angle = angle;
-
-            // Create a TransformGroup to contain the transforms
-            // and add the transforms to it.
-            TransformGroup myTransformGroup = new TransformGroup();
-            myTransformGroup.Children.Add(myRotateTransform);
-
-            //displayImage.RenderTransformOrigin = new Point(0.5, 0.5);
-            // Associate the transforms to the button.
-            //displayImage.RenderTransform = myTransformGroup;
-        }
-
-        private void SetImageSize()
-        {
-            //if (displayImage?.Source != null)
-            //{
-            //    // Set image size so that corners stay in the window when rotating
-            //    var w = displayImage.Source.Width;
-            //    var h = displayImage.Source.Height;
-            //    var diag = Math.Sqrt(w * w + h * h);
-
-            //    var scale = Math.Min(this.Width, this.Height) / diag;
-            //    Container.MaxWidth = w * scale;
-            //    Container.MaxHeight = h * scale;
-            //}
-        }
-
-        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            SetImageSize();
-        }
-
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ChangedButton == MouseButton.Left)
-                this.DragMove();
-        }
-
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             cp.Owner = this;
@@ -128,19 +78,36 @@ namespace ImgOverlay
             return (ContentPresenter)((Control)sender).TemplatedParent;
         }
 
-        private RotateTransform GetSafeRotateTransform(UIElement control)
+        private RotateTransform GetSafeRotateTransform(Panel control)
         {
-            var rotate = (control.RenderTransform as RotateTransform) ?? new RotateTransform(0);
+            RotateTransform rotate = (control.RenderTransform as RotateTransform) ?? new RotateTransform(0);
             control.RenderTransform = rotate;
             return rotate;
         }
 
+        private ScaleTransform GetSafeScaleTransform(Panel control)
+        {
+            ScaleTransform scale = (control.RenderTransform as ScaleTransform) ?? new ScaleTransform(1, 1);
+            control.RenderTransform = scale;
+            return scale;
+        }
+
+        private Grid GetRotateContainer(object sender)
+        {
+            return (Grid) ((Thumb) sender).FindName("RotateContainer");
+        }
+
+        private Grid GetScaleContainer(object sender)
+        {
+            return (Grid)((Thumb)sender).FindName("ScaleContainer");
+        }
+
         public void RotateThumb_DragStarted(object sender, DragStartedEventArgs e)
         {
-            var presenter = GetItemRoot(sender);
+            var container = GetRotateContainer(sender);
 
-            var halfW = presenter.ActualWidth / 2;
-            var halfH = presenter.ActualHeight / 2;
+            var halfW = container.ActualWidth / 2;
+            var halfH = container.ActualHeight / 2;
 
             _center = new Point(halfW, halfH);
 
@@ -149,20 +116,32 @@ namespace ImgOverlay
 
         private void RotateThumb_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            var presenter = GetItemRoot(sender);
-            var rotate = GetSafeRotateTransform(presenter);
+            var container = GetRotateContainer(sender);
+            var rotate = GetSafeRotateTransform(container);
             rotate.Angle = 0;
 
-            var pos = Mouse.GetPosition(presenter);
+            var pos = Mouse.GetPosition(container);
             double angle = Math.Atan2((pos.Y - _center.Y), (pos.X - _center.X)) * (180 / Math.PI) + thumbAngle;
             rotate.Angle = angle;
+        }
+
+        private void RotateThumb_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var container = GetRotateContainer(sender);
+            var rotate = GetSafeRotateTransform(container);
+            rotate.Angle = 0;
         }
 
         private void MoveThumb_DragDelta(object sender, DragDeltaEventArgs e)
         {
             var presenter = GetItemRoot(sender);
-            var rotate = GetSafeRotateTransform(presenter);
-            var transformedChange = rotate.Transform(new Point(e.HorizontalChange, e.VerticalChange));
+            var container = GetRotateContainer(sender);
+            var scaleContainer = GetScaleContainer(sender);
+            var rotate = GetSafeRotateTransform(container);
+            var scale = GetSafeScaleTransform(scaleContainer);
+            var transformedChange = new Point(e.HorizontalChange, e.VerticalChange);
+            transformedChange = scale.Transform(transformedChange);
+            transformedChange = rotate.Transform(transformedChange);
 
             var l = Canvas.GetLeft(presenter);
             var t = Canvas.GetTop(presenter);
@@ -171,6 +150,47 @@ namespace ImgOverlay
 
             Canvas.SetLeft(presenter, l + transformedChange.X);
             Canvas.SetTop(presenter, t + transformedChange.Y);
+        }
+
+        private void ScaleContainer_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            var container = (Grid)sender;
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                var scale = GetSafeScaleTransform(container);
+                var sX = (container.ActualWidth + (e.Delta / 5)) / container.ActualWidth;
+                scale.ScaleX *= sX;
+                scale.ScaleY *= sX;
+            }
+            else
+            {
+                var imageThumb = (Thumb) container.FindName("DisplayImageThumb");
+                var img = (Image) imageThumb.Template.FindName("DisplayImage", imageThumb);
+                var o = img.Opacity + e.Delta / 2000.0;
+                img.Opacity = Math.Max(Math.Min(o, 1), 0.1);
+            }
+        }
+
+        public void ScaleThumb_DragStarted(object sender, DragStartedEventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void ScaleThumb_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    public class BoolToVisiblityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return (bool)value ? "Visible" : "Hidden";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return value.ToString() == "Visible";
         }
     }
 }

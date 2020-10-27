@@ -69,25 +69,5 @@ namespace ImgOverlay
                 (Owner as MainWindow)?.LoadImage(openDialog.FileName);
             }
         }
-
-        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            (Owner as MainWindow)?.ChangeOpacity((float)e.NewValue / 100.0f);
-        }
-
-        private void OpacitySlider_DoubleClicked(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            OpacitySlider.SetValue(RangeBase.ValueProperty, 100.0);
-        }
-
-        private void RotateSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            (Owner as MainWindow)?.ChangeRotation((float)e.NewValue);
-        }
-
-        private void RotateSlider_DoubleClicked(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            RotateSlider.SetValue(RangeBase.ValueProperty, 0.0);
-        }
     }
 }
