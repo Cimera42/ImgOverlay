@@ -17,22 +17,36 @@
     <Window.Background>
         <SolidColorBrush Opacity="0" Color="White" />
     </Window.Background>
-    <Canvas>
-        <Grid x:Name="Container" Width="525" Height="350" Canvas.Left="0" Canvas.Top="0" Background="Transparent">
-            <Thumb DragDelta="Thumb2_DragDelta" x:Name="DisplayImageThumb" >
-                <Thumb.Template>
-                    <ControlTemplate>
-                        <Image Cursor="SizeAll" x:Name="DisplayImage"/>
-                    </ControlTemplate>
-                </Thumb.Template>
-            </Thumb>
-            <Thumb DragDelta="Thumb_DragDelta" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Bottom" DragStarted="Thumb_DragStarted">
-                <Thumb.Template>
-                    <ControlTemplate>
-                        <Canvas Background="red"/>
-                    </ControlTemplate>
-                </Thumb.Template>
-            </Thumb>
-        </Grid>
-    </Canvas>
+    <ItemsControl ItemsSource="{Binding}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <Canvas />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate>
+                <Grid x:Name="Container" Width="{Binding PixelWidth}" Height="{Binding PixelHeight}">
+                    <Thumb DragDelta="MoveThumb_DragDelta" x:Name="DisplayImageThumb" >
+                        <Thumb.Template>
+                            <ControlTemplate>
+                                <Image Cursor="SizeAll" x:Name="DisplayImage" Source="{Binding}"/>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+                    <Thumb Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Top" DragDelta="RotateThumb_DragDelta" DragStarted="RotateThumb_DragStarted">
+                        <Thumb.Template>
+                            <ControlTemplate>
+                                <Canvas Background="red"/>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+                </Grid>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+        <ItemsControl.ItemContainerStyle>
+            <Style TargetType="ContentPresenter">
+                <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            </Style>
+        </ItemsControl.ItemContainerStyle>
+    </ItemsControl>
 </Window>

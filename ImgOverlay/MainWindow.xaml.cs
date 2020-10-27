@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Runtime.InteropServices;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -15,7 +15,7 @@ namespace ImgOverlay
     public partial class MainWindow : Window
     {
         private ControlPanel cp = new ControlPanel();
-        private Image displayImage;
+        private ObservableCollection<BitmapImage> images = new ObservableCollection<BitmapImage>();
 
         public MainWindow()
         {
@@ -24,6 +24,8 @@ namespace ImgOverlay
             InitializeComponent();
 
             this.SizeChanged += Window_SizeChanged;
+
+            DataContext = images;
         }
 
         public void LoadImage(string path)
@@ -53,13 +55,12 @@ namespace ImgOverlay
                 return;
             }
 
-            ((Image) DisplayImageThumb.Template.FindName("DisplayImage", DisplayImageThumb)).Source = img;
-            SetImageSize();
+            images.Add(img);
         }
 
         public void ChangeOpacity(float opacity)
         {
-            displayImage.Opacity = opacity;
+            //displayImage.Opacity = opacity;
         }
 
         public void ChangeRotation(float angle)
@@ -75,24 +76,24 @@ namespace ImgOverlay
             TransformGroup myTransformGroup = new TransformGroup();
             myTransformGroup.Children.Add(myRotateTransform);
 
-            displayImage.RenderTransformOrigin = new Point(0.5, 0.5);
+            //displayImage.RenderTransformOrigin = new Point(0.5, 0.5);
             // Associate the transforms to the button.
-            displayImage.RenderTransform = myTransformGroup;
+            //displayImage.RenderTransform = myTransformGroup;
         }
 
         private void SetImageSize()
         {
-            if (displayImage?.Source != null)
-            {
-                // Set image size so that corners stay in the window when rotating
-                var w = displayImage.Source.Width;
-                var h = displayImage.Source.Height;
-                var diag = Math.Sqrt(w * w + h * h);
+            //if (displayImage?.Source != null)
+            //{
+            //    // Set image size so that corners stay in the window when rotating
+            //    var w = displayImage.Source.Width;
+            //    var h = displayImage.Source.Height;
+            //    var diag = Math.Sqrt(w * w + h * h);
 
-                var scale = Math.Min(this.Width, this.Height) / diag;
-                Container.MaxWidth = w * scale;
-                Container.MaxHeight = h * scale;
-            }
+            //    var scale = Math.Min(this.Width, this.Height) / diag;
+            //    Container.MaxWidth = w * scale;
+            //    Container.MaxHeight = h * scale;
+            //}
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -108,19 +109,12 @@ namespace ImgOverlay
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            WindowMovePreventer.AddWindow(this);
-
             cp.Owner = this;
             cp.Show();
             cp.Closed += (o, ev) =>
             {
                 this.Close();
             };
-
-            Container.RenderTransform = (Container.RenderTransform as RotateTransform) ?? new RotateTransform(0);
-            Container.RenderTransformOrigin = new Point(0.5, 0.5);
-
-            displayImage = (Image) DisplayImageThumb.Template.FindName("DisplayImage", DisplayImageThumb);
 
             this.Width = SystemParameters.VirtualScreenWidth;
             this.Height = SystemParameters.VirtualScreenHeight;
@@ -129,90 +123,54 @@ namespace ImgOverlay
         private Point _center;
         private double thumbAngle;
 
-        public void Thumb_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+        private ContentPresenter GetItemRoot(object sender)
         {
-            _center = new Point(Container.ActualWidth / 2, Container.ActualHeight / 2);
-
-            thumbAngle = Math.Atan((Container.ActualHeight / 2) / (Container.ActualWidth / 2)) * (180 / Math.PI);
+            return (ContentPresenter)((Control)sender).TemplatedParent;
         }
 
-        private void Thumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        private RotateTransform GetSafeRotateTransform(UIElement control)
         {
-            var rotate = (RotateTransform)Container.RenderTransform;
+            var rotate = (control.RenderTransform as RotateTransform) ?? new RotateTransform(0);
+            control.RenderTransform = rotate;
+            return rotate;
+        }
+
+        public void RotateThumb_DragStarted(object sender, DragStartedEventArgs e)
+        {
+            var presenter = GetItemRoot(sender);
+
+            var halfW = presenter.ActualWidth / 2;
+            var halfH = presenter.ActualHeight / 2;
+
+            _center = new Point(halfW, halfH);
+
+            thumbAngle = Math.Atan(halfH / halfW) * (180 / Math.PI);
+        }
+
+        private void RotateThumb_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var presenter = GetItemRoot(sender);
+            var rotate = GetSafeRotateTransform(presenter);
             rotate.Angle = 0;
 
-            var pos = Mouse.GetPosition(Container);
-            double angle = Math.Atan2((pos.Y - _center.Y), (pos.X - _center.X)) * (180 / Math.PI) - thumbAngle;
+            var pos = Mouse.GetPosition(presenter);
+            double angle = Math.Atan2((pos.Y - _center.Y), (pos.X - _center.X)) * (180 / Math.PI) + thumbAngle;
             rotate.Angle = angle;
         }
 
-        private void Thumb2_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        private void MoveThumb_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            Canvas.SetLeft(Container, Canvas.GetLeft(Container) + e.HorizontalChange);
-            Canvas.SetTop(Container, Canvas.GetTop(Container) + e.VerticalChange);
+            var presenter = GetItemRoot(sender);
+            var rotate = GetSafeRotateTransform(presenter);
+            var transformedChange = rotate.Transform(new Point(e.HorizontalChange, e.VerticalChange));
 
-            //var rotate = (RotateTransform)Container.RenderTransform;
-            //rotate.Angle = 0;
+            var l = Canvas.GetLeft(presenter);
+            var t = Canvas.GetTop(presenter);
+            if (double.IsNaN(l)) l = 0;
+            if (double.IsNaN(t)) t = 0;
 
-            //if (!ignore)
-            //{
-            //    var newWidth = Math.Max(0, this.Width + e.HorizontalChange);
-            //    var newHeight = Math.Max(0, this.Height + e.VerticalChange);
-
-            //    var wDiff = this.Width - newWidth;
-            //    var hDiff = this.Height - newHeight;
-
-            //    this.Width = newWidth;
-            //    this.Height = newHeight;
-
-            //    this.Left -= wDiff / 2;
-            //    this.Top -= hDiff / 2;
-            //    ignore = true;
-            //}
-            //else
-            //{
-            //        ignore = false;
-            //}
-        }
-    }
-
-    public static class WindowMovePreventer
-    {
-        /// <summary>
-        /// Prevent Windows from moving window back to top of screen if window goes above top of screen.
-        /// https://stackoverflow.com/questions/328127/how-do-i-move-a-wpf-window-into-a-negative-top-value
-        /// </summary>
-        public struct WINDOWPOS
-        {
-            public IntPtr hwnd;
-            public IntPtr hwndInsertAfter;
-            public int x;
-            public int y;
-            public int cx;
-            public int cy;
-            public UInt32 flags;
-        };
-
-        public static void AddWindow(Window window)
-        {
-            HwndSource source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
-            source.AddHook(new HwndSourceHook(WndProc));
-        }
-
-        private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            switch (msg)
-            {
-                case 0x46://WM_WINDOWPOSCHANGING
-                    if (Mouse.LeftButton != MouseButtonState.Pressed)
-                    {
-                        WINDOWPOS wp = (WINDOWPOS)Marshal.PtrToStructure(lParam, typeof(WINDOWPOS));
-                        wp.flags = wp.flags | 2; //SWP_NOMOVE
-                        Marshal.StructureToPtr(wp, lParam, false);
-                    }
-                    break;
-            }
-            return IntPtr.Zero;
+            Canvas.SetLeft(presenter, l + transformedChange.X);
+            Canvas.SetTop(presenter, t + transformedChange.Y);
         }
     }
 }
